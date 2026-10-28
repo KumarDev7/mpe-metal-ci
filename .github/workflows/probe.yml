@@ -1,0 +1,31 @@
+name: probe
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-26, xcode-27]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: machine
+        run: |
+          sw_vers; uname -a
+          sysctl -n machdep.cpu.brand_string hw.model hw.ncpu hw.memsize hw.perflevel0.physicalcpu 2>/dev/null || true
+          system_profiler SPHardwareDataType SPDisplaysDataType
+          df -h / /tmp
+          xcode-select -p; swiftc --version; rustc --version || true; cargo --version || true
+          which rclone brew || true
+      - name: metal probe
+        run: |
+          swiftc -O probe/probe.swift -o probe_bin
+          ./probe_bin 2>&1 | tee probe-${{ matrix.os }}.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-${{ matrix.os }}
+          path: probe-*.txt
