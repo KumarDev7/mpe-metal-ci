@@ -1,0 +1,34 @@
+name: shell
+# A macOS runner joined to the relay as a shell target, until ~/stop exists or time runs out.
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: runner label
+        default: macos-26
+      minutes:
+        description: minutes to stay up
+        default: "345"
+      id:
+        description: relay target id
+        default: mac-metal
+jobs:
+  shell:
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 355
+    steps:
+      - name: relay target
+        env:
+          RELAYFS_TOKEN: ${{ secrets.RELAYFS_TOKEN }}
+          RELAYFS_URL: ${{ secrets.RELAYFS_URL }}
+        run: |
+          curl -fsSL -o "$HOME/relayfs" https://github.com/KumarDev7/relayfs/releases/download/v0.5.1/relayfs-aarch64-apple-darwin
+          chmod +x "$HOME/relayfs"
+          mkdir -p "$HOME/work"
+          (cd "$HOME/work" && nohup "$HOME/relayfs" --mode target --base-url "$RELAYFS_URL" --token "$RELAYFS_TOKEN" --id "${{ inputs.id }}" > "$HOME/relay.log" 2>&1 &)
+          end=$(( $(date +%s) + ${{ inputs.minutes }} * 60 ))
+          while [ ! -f "$HOME/stop" ] && [ "$(date +%s)" -lt "$end" ]; do
+            sleep 30
+            pgrep -f "relayfs --mode target" > /dev/null || { echo "relay target exited"; tail -20 "$HOME/relay.log"; exit 1; }
+          done
+          echo "stopping"
