@@ -25,10 +25,15 @@ jobs:
           curl -fsSL -o "$HOME/relayfs" https://github.com/KumarDev7/relayfs/releases/download/v0.5.1/relayfs-aarch64-apple-darwin
           chmod +x "$HOME/relayfs"
           mkdir -p "$HOME/work"
-          (cd "$HOME/work" && nohup "$HOME/relayfs" --mode target --base-url "$RELAYFS_URL" --token "$RELAYFS_TOKEN" --id "${{ inputs.id }}" > "$HOME/relay.log" 2>&1 &)
+          file "$HOME/relayfs"; "$HOME/relayfs" --version
+          echo "relay url length ${#RELAYFS_URL}, token length ${#RELAYFS_TOKEN}"
+          (cd "$HOME/work" && nohup "$HOME/relayfs" --mode target --base-url "$RELAYFS_URL" --token "$RELAYFS_TOKEN" --id "${{ inputs.id }}" --name "${{ inputs.os }}" > "$HOME/relay.log" 2>&1 &)
           end=$(( $(date +%s) + ${{ inputs.minutes }} * 60 ))
+          shown=0
           while [ ! -f "$HOME/stop" ] && [ "$(date +%s)" -lt "$end" ]; do
-            sleep 30
-            pgrep -f "relayfs --mode target" > /dev/null || { echo "relay target exited"; tail -20 "$HOME/relay.log"; exit 1; }
+            sleep 10
+            # new relay log lines into the job log
+            n=$(wc -l < "$HOME/relay.log"); if [ "$n" -gt "$shown" ]; then tail -n +$((shown + 1)) "$HOME/relay.log" | head -50; shown=$n; fi
+            pgrep -f "relayfs --mode target" > /dev/null || { echo "relay target exited"; exit 1; }
           done
           echo "stopping"
