@@ -1,5 +1,6 @@
 name: shell
-# A macOS runner joined to the relay as a shell target, until ~/stop exists or time runs out.
+# A runner (macOS, or Linux with Mesa's software Vulkan) joined to the relay as a
+# shell target, until ~/stop exists or time runs out.
 on:
   workflow_dispatch:
     inputs:
@@ -22,11 +23,19 @@ jobs:
           RELAYFS_TOKEN: ${{ secrets.RELAYFS_TOKEN }}
           RELAYFS_URL: ${{ secrets.RELAYFS_URL }}
         run: |
-          curl -fsSL -o "$HOME/relayfs" https://github.com/KumarDev7/relayfs/releases/download/v0.5.1/relayfs-aarch64-apple-darwin
+          if [ "$RUNNER_OS" = macOS ]; then
+            curl -fsSL -o "$HOME/relayfs" https://github.com/KumarDev7/relayfs/releases/download/v0.5.1/relayfs-aarch64-apple-darwin
+            # the binary links macFUSE's libfuse (target mode never mounts)
+            brew install --cask macfuse > /dev/null 2>&1 || true
+            ls -la /usr/local/lib/libfuse.2.dylib
+          else
+            curl -fsSL -o "$HOME/relayfs" https://github.com/KumarDev7/relayfs/releases/download/v0.5.1/relayfs-x86_64-unknown-linux-musl
+            # lavapipe: a Vulkan driver on the CPU, for GPU code on GPU-less runners
+            sudo apt-get update -qq && sudo apt-get install -y -qq mesa-vulkan-drivers vulkan-tools > /dev/null
+            sudo apt-get install -y -qq libfuse2t64 > /dev/null 2>&1 || sudo apt-get install -y -qq libfuse2 > /dev/null 2>&1 || true
+            vulkaninfo --summary 2>&1 | grep -iE "deviceName|driverName" | head -4
+          fi
           chmod +x "$HOME/relayfs"
-          # the binary links macFUSE's libfuse (target mode never mounts)
-          brew install --cask macfuse > /dev/null 2>&1 || true
-          ls -la /usr/local/lib/libfuse.2.dylib
           mkdir -p "$HOME/work"
           file "$HOME/relayfs"; "$HOME/relayfs" --version
           echo "relay url length ${#RELAYFS_URL}, token length ${#RELAYFS_TOKEN}"
