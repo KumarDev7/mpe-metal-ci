@@ -24,6 +24,9 @@ jobs:
         run: |
           curl -fsSL -o "$HOME/relayfs" https://github.com/KumarDev7/relayfs/releases/download/v0.5.1/relayfs-aarch64-apple-darwin
           chmod +x "$HOME/relayfs"
+          # the binary links macFUSE's libfuse (target mode never mounts)
+          brew install --cask macfuse > /dev/null 2>&1 || true
+          ls -la /usr/local/lib/libfuse.2.dylib
           mkdir -p "$HOME/work"
           file "$HOME/relayfs"; "$HOME/relayfs" --version
           echo "relay url length ${#RELAYFS_URL}, token length ${#RELAYFS_TOKEN}"
